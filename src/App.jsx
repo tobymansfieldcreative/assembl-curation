@@ -49,7 +49,7 @@ const VENUES_TABLE = 'venues';
 const DECISIONS_TABLE = 'curation_decisions';
 
 // Columns to fetch — enough for curation without pulling the full schema
-const VENUE_SELECT = 'id,name,category,address,locality,lat,lng,website,verified_url,url_source,scraped_url,description,image_urls,booking_url,phone,features_stale,craft_beer,real_ale,cocktails,good_wine_list,natural_wine,outdoor_seating,rooftop,garden_courtyard,live_music,dj_night,pub_quiz,dog_friendly,food_available,sunday_roast,sports_screens,late_license,large_groups,private_dining,bookable_tables,happy_hour,independent,brewery_taproom,historic_building,lgbtq_friendly,accessible,fireplace';
+const VENUE_SELECT = 'id,name,category,address,locality,lat,lng,website,verified_url,url_source,scraped_url,description,image_urls,booking_url,phone,features_stale,craft_beer,real_ale,cocktails,good_wine_list,natural_wine,outdoor_seating,rooftop,garden_courtyard,live_music,dj_night,pub_quiz,dog_friendly,food_available,sunday_roast,sports_screens,late_license,large_groups,private_dining,bookable_tables,happy_hour,independent,brewery_taproom,historic_building,lgbtq_friendly,accessible,fireplace,shuffleboard,arcade_games,drag_shows,burlesque,bingo,table_football,axe_throwing,petanque,immersive,crazy_golf,social_cricket,vinyl,film_screening,escape_room';
 
 async function supabaseRequest(method, path, body) {
   const prefer =
@@ -95,6 +95,12 @@ const FEATURE_LABELS = {
   private_dining: 'Private Dining', bookable_tables: 'Bookable', happy_hour: 'Happy Hour',
   independent: 'Independent', brewery_taproom: 'Taproom', historic_building: 'Historic',
   lgbtq_friendly: 'LGBTQ+', accessible: 'Accessible', fireplace: 'Fireplace',
+  // Activity features
+  shuffleboard: 'Shuffleboard', arcade_games: 'Arcade Games', drag_shows: 'Drag Shows',
+  burlesque: 'Burlesque', bingo: 'Bingo', table_football: 'Table Football',
+  axe_throwing: 'Axe Throwing', petanque: 'Pétanque', immersive: 'Immersive',
+  crazy_golf: 'Crazy Golf', social_cricket: 'Social Cricket', vinyl: 'Vinyl DJ',
+  film_screening: 'Film Screening', escape_room: 'Escape Room',
 };
 
 // ─── Password gate ────────────────────────────────────────────────────────────
