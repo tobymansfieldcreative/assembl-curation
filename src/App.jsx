@@ -49,7 +49,7 @@ const VENUES_TABLE = 'venues';
 const DECISIONS_TABLE = 'curation_decisions';
 
 // Columns to fetch — enough for curation without pulling the full schema
-const VENUE_SELECT = 'id,name,category,address,locality,lat,lng,website,verified_url,url_source,scraped_url,description,image_urls,booking_url,phone,features_stale,features';
+const VENUE_SELECT = 'id,name,category,address,locality,borough,lat,lng,website,verified_url,url_source,scraped_url,description,image_urls,booking_url,phone,features_stale,features';
 
 async function supabaseRequest(method, path, body) {
   const prefer =
@@ -515,7 +515,7 @@ function VenueCard({ venue, decision, notes, curatedImages, onDecide, onNotes, o
         </div>
 
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-          {[CATEGORY_LABELS[venue.category] || venue.category, venue.locality || venue.area].filter(Boolean).join(' · ')}
+          {[CATEGORY_LABELS[venue.category] || venue.category, venue.borough || venue.area].filter(Boolean).join(' · ')}
           {imageCount > 0 && (
             <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>
               · {imageCount} photo{imageCount !== 1 ? 's' : ''}{imagesModified && originalCount !== imageCount ? ` (was ${originalCount})` : ''}
