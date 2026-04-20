@@ -49,7 +49,7 @@ const VENUES_TABLE = 'venues';
 const DECISIONS_TABLE = 'curation_decisions';
 
 // Columns to fetch — enough for curation without pulling the full schema
-const VENUE_SELECT = 'id,name,category,address,locality,lat,lng,website,verified_url,url_source,scraped_url,description,image_urls,booking_url,phone,features_stale,craft_beer,real_ale,cocktails,good_wine_list,natural_wine,outdoor_seating,rooftop,garden_courtyard,live_music,dj_night,pub_quiz,dog_friendly,food_available,sunday_roast,sports_screens,late_license,large_groups,private_dining,bookable_tables,happy_hour,independent,brewery_taproom,historic_building,lgbtq_friendly,accessible,fireplace,shuffleboard,arcade_games,drag_shows,burlesque,bingo,table_football,axe_throwing,petanque,immersive,crazy_golf,social_cricket,vinyl,film_screening,escape_room';
+const VENUE_SELECT = 'id,name,category,address,locality,lat,lng,website,verified_url,url_source,scraped_url,description,image_urls,booking_url,phone,features_stale,features';
 
 async function supabaseRequest(method, path, body) {
   const prefer =
@@ -74,6 +74,17 @@ function parseImages(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val;
   try { return JSON.parse(val); } catch { return []; }
+}
+
+function parseFeatureSlugs(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  try {
+    const parsed = JSON.parse(val);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 // ─── Category / feature labels ────────────────────────────────────────────────
@@ -165,7 +176,7 @@ function ImageCarousel({ images }) {
         }}>
           <div style={{ fontSize: 28 }}>🖼️</div>
           <div>Image failed to load</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 280, textAlign: 'center', wordBreak: 'break-all' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 280, textAlign: 'left', wordBreak: 'break-all' }}>
             {urls[idx]}
           </div>
         </div>
@@ -251,7 +262,7 @@ function ImageCurationGrid({ images, onChange }) {
   if (!urls.length) return (
     <div style={{
       padding: '20px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)',
-      textAlign: 'center', color: 'var(--text-muted)', fontSize: 13,
+      textAlign: 'left', color: 'var(--text-muted)', fontSize: 13,
       border: '1px dashed var(--border-default)',
     }}>
       No images — will be scraped on next pipeline run
@@ -282,7 +293,7 @@ function ImageCurationGrid({ images, onChange }) {
               <div style={{
                 width: '100%', height: '100%', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', flexDirection: 'column', gap: 4,
-                color: 'var(--text-muted)', fontSize: 11, padding: 8, textAlign: 'center',
+                color: 'var(--text-muted)', fontSize: 11, padding: 8, textAlign: 'left',
               }}>
                 <div>🚫</div>
                 <div style={{ wordBreak: 'break-all', fontSize: 9, lineHeight: 1.3 }}>{url.slice(0, 60)}...</div>
@@ -441,9 +452,9 @@ function AddImageRow({ onAdd }) {
 
 // ─── Venue card ────────────────────────────────────────────────────────────────
 function VenueCard({ venue, decision, notes, curatedImages, onDecide, onNotes, onImageChange, isExpanded, onToggle }) {
-  const features = Object.entries(FEATURE_LABELS)
-    .filter(([slug]) => venue[slug] === true)
-    .map(([, label]) => label);
+  const features = parseFeatureSlugs(venue.features)
+    .map((slug) => FEATURE_LABELS[slug] || slug.replace(/_/g, ' '))
+    .filter(Boolean);
 
   // Use curated images if available, otherwise fall back to venue images
   const displayImages = curatedImages !== undefined ? curatedImages : venue.image_urls;
@@ -462,6 +473,7 @@ function VenueCard({ venue, decision, notes, curatedImages, onDecide, onNotes, o
       }`,
       borderRadius: 'var(--radius-lg)',
       overflow: 'hidden',
+      textAlign: 'left',
       transition: 'border-color 0.2s',
     }}>
 
@@ -807,7 +819,7 @@ export default function CurationApp() {
         <div style={{
           background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)',
           border: '1px solid var(--border-default)', padding: '40px 36px',
-          width: 360, textAlign: 'center',
+          width: 360, textAlign: 'left',
         }}>
           <div style={{
             fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 24,
@@ -825,7 +837,7 @@ export default function CurationApp() {
               border: `1px solid ${wrongPassword ? 'rgba(239,68,68,0.5)' : 'var(--border-default)'}`,
               borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
               fontFamily: 'var(--font-body)', fontSize: 14, padding: '11px 14px',
-              outline: 'none', marginBottom: 12, textAlign: 'center', transition: 'border-color 0.2s, background 0.2s',
+              outline: 'none', marginBottom: 12, textAlign: 'left', transition: 'border-color 0.2s, background 0.2s',
             }}
           />
           {wrongPassword && <div style={{ color: '#EF4444', fontSize: 12, marginBottom: 12, fontFamily: 'var(--font-display)' }}>Incorrect password</div>}
@@ -855,7 +867,7 @@ export default function CurationApp() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, padding: 32 }}>
         <div style={{ fontSize: 32 }}>⚠️</div>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>Failed to load venues</div>
-        <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', maxWidth: 400 }}>{loadError}</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'left', maxWidth: 400 }}>{loadError}</div>
       </div>
     </>
   );
@@ -866,14 +878,14 @@ export default function CurationApp() {
 
       {showReviewerPrompt && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-default)', padding: 32, width: 340, textAlign: 'center' }}>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-default)', padding: 32, width: 340, textAlign: 'left' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Who are you?</div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>Your name will be saved with each decision.</div>
             <input
               autoFocus placeholder="Your name" value={reviewer}
               onChange={e => setReviewer(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && reviewer.trim()) { localStorage.setItem('assembl_reviewer', reviewer.trim()); setShowReviewerPrompt(false); } }}
-              style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-body)', fontSize: 14, padding: '10px 14px', outline: 'none', marginBottom: 16, textAlign: 'center' }}
+              style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-body)', fontSize: 14, padding: '10px 14px', outline: 'none', marginBottom: 16, textAlign: 'left' }}
             />
             <button onClick={() => { if (reviewer.trim()) { localStorage.setItem('assembl_reviewer', reviewer.trim()); setShowReviewerPrompt(false); } }}
               style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius-full)', border: 'none', backgroundImage: 'var(--color-brand-gradient)', color: '#fff', fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
@@ -904,7 +916,7 @@ export default function CurationApp() {
               { label: 'Flagged', count: flagged, color: '#F59E0B' },
               { label: 'Imgs edited', count: imagesCurated, color: '#818CF8' },
             ].map(s => (
-              <div key={s.label} style={{ textAlign: 'center' }}>
+              <div key={s.label} style={{ textAlign: 'left' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, color: s.color }}>{s.count}</div>
                 <div style={{ color: 'var(--text-muted)' }}>{s.label}</div>
               </div>
@@ -936,7 +948,7 @@ export default function CurationApp() {
       {/* Venue grid */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
+          <div style={{ textAlign: 'left', padding: '80px 0', color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No venues found</div>
             <div style={{ fontSize: 14 }}>Try adjusting your filter or search</div>
