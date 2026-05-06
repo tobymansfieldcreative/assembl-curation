@@ -961,16 +961,13 @@ function DupesSection({ who, showToast, onStatsChange }) {
 
   const runScan = async () => {
     setComputing(true);
-    showToast('Scanning for duplicates…','warning');
+    showToast('Rebuilding duplicate queue…','warning');
     try {
-      // Seed with already-pending canonical pairs so repeat scans don't reinsert them.
-      const { data: existingPending } = await sb('GET','duplicate_candidates?select=venue_a,venue_b&status=eq.pending&limit=100000');
-      const seen = new Set(
-        (Array.isArray(existingPending) ? existingPending : []).map(r => {
-          const [a,b] = [r.venue_a, r.venue_b].sort();
-          return `${a}|${b}`;
-        })
-      );
+      // Rebuild strategy: clear pending queue, then regenerate from current venue data.
+      await sb('DELETE','duplicate_candidates?status=eq.pending');
+      setSel(null);
+      setCands([]);
+      const seen = new Set();
 
       let all=[];
       for (let off=0;;off+=1000) {
@@ -993,8 +990,8 @@ function DupesSection({ who, showToast, onStatsChange }) {
           pairs.push({venue_a:venueA,venue_b:venueB,similarity_score:sim,distance_metres:Math.round(dist),detection_method:'proximity_name',status:'pending'});
         }
       }
-      if (!pairs.length) { showToast('No new candidates found','warning'); }
-      else { await sb('POST','duplicate_candidates',pairs); showToast(`Found ${pairs.length} candidate${pairs.length!==1?'s':''}`); await loadCands(); onStatsChange(); }
+      if (!pairs.length) { showToast('No duplicates found in current data','warning'); }
+      else { await sb('POST','duplicate_candidates',pairs); showToast(`Queue rebuilt: ${pairs.length} candidate${pairs.length!==1?'s':''}`); await loadCands(); onStatsChange(); }
     } catch(e){ showToast(e.message,'error'); } finally { setComputing(false); }
   };
 
@@ -1029,8 +1026,80 @@ function DupesSection({ who, showToast, onStatsChange }) {
       await sb('PATCH',`venues?id=eq.${b.id}`,{curation_status:'deleted',curation_notes:`Merged into ${a.id}`});
       try{await sb('PATCH',`outing_venues?venue_id=eq.${b.id}`,{venue_id:a.id});}catch{}
       await sb('PATCH',`duplicate_candidates?id=eq.${candId}`,{status:'merged'});
+      await Promise.all([
+        sb('PATCH',`duplicate_candidates?status=eq.pending&venue_a=eq.${b.id}`,{status:'dismissed'}),
+        sb('PATCH',`duplicate_candidates?status=eq.pending&venue_b=eq.${b.id}`,{status:'dismissed'}),
+      ]);
+
+      // Step 2: Revalidate candidates touching kept venue (a.id), and generate any new valid pairs for it.
+      const [{ data: aSide }, { data: bSide }] = await Promise.all([
+        sb('GET',`duplicate_candidates?select=id,venue_a,venue_b&status=eq.pending&venue_a=eq.${a.id}&limit=100000`),
+        sb('GET',`duplicate_candidates?select=id,venue_a,venue_b&status=eq.pending&venue_b=eq.${a.id}&limit=100000`),
+      ]);
+      const touchingA = [...(Array.isArray(aSide)?aSide:[]), ...(Array.isArray(bSide)?bSide:[])];
+      const counterpartIds = [...new Set(touchingA.map(c => c.venue_a===a.id ? c.venue_b : c.venue_a).filter(Boolean))];
+
+      const [{ data: [aFresh] = [] }, counterpartsResp] = await Promise.all([
+        sb('GET',`venues?select=id,name,lat,lng,curation_status,permanently_closed&id=eq.${a.id}&limit=1`),
+        counterpartIds.length ? sb('GET',`venues?select=id,name,lat,lng,curation_status,permanently_closed&id=in.(${counterpartIds.join(',')})`) : Promise.resolve({data:[]}),
+      ]);
+      const counterparts = Array.isArray(counterpartsResp.data) ? counterpartsResp.data : [];
+      const counterpartMap = Object.fromEntries(counterparts.map(v=>[v.id,v]));
+
+      const shouldKeepPair = (x, y) => {
+        if (!x?.lat || !y?.lat) return false;
+        if (x.curation_status || y.curation_status) return false;
+        if (x.permanently_closed || y.permanently_closed) return false;
+        const dist = haversineM(x.lat,x.lng,y.lat,y.lng);
+        if (dist > 150) return false;
+        const sim = nameSimilarity(x.name||'', y.name||'');
+        return sim >= 0.72;
+      };
+
+      const staleIds = touchingA
+        .filter(c => !shouldKeepPair(aFresh, counterpartMap[c.venue_a===a.id ? c.venue_b : c.venue_a]))
+        .map(c => c.id);
+      if (staleIds.length) {
+        await sb('PATCH',`duplicate_candidates?id=in.(${staleIds.join(',')})`,{status:'dismissed'});
+      }
+
+      // Generate missing valid pairs for a.id only.
+      let activeOthers=[];
+      for (let off=0;;off+=1000) {
+        const { data } = await sb('GET',`venues?select=id,name,lat,lng,curation_status,permanently_closed&curation_status=is.null&permanently_closed=neq.true&lat=not.is.null&limit=1000&offset=${off}`);
+        const rows = Array.isArray(data) ? data : [];
+        if (!rows.length) break;
+        activeOthers = activeOthers.concat(rows);
+        if (rows.length < 1000) break;
+      }
+      const pendingKeys = new Set(
+        touchingA
+          .filter(c => !staleIds.includes(c.id))
+          .map(c => `${[c.venue_a,c.venue_b].sort().join('|')}`)
+      );
+      const newPairs=[];
+      for (const v of activeOthers) {
+        if (v.id===a.id) continue;
+        if (!shouldKeepPair(aFresh, v)) continue;
+        const [x,y] = [a.id, v.id].sort();
+        const key = `${x}|${y}`;
+        if (pendingKeys.has(key)) continue;
+        pendingKeys.add(key);
+        newPairs.push({
+          venue_a:x, venue_b:y,
+          similarity_score:nameSimilarity(aFresh.name||'', v.name||''),
+          distance_metres:Math.round(haversineM(aFresh.lat,aFresh.lng,v.lat,v.lng)),
+          detection_method:'proximity_name',
+          status:'pending',
+        });
+      }
+      if (newPairs.length) await sb('POST','duplicate_candidates',newPairs);
+
       showToast(`Merged "${b.name}" into "${a.name}"`);
-      setCands(c=>c.filter(x=>x.id!==candId)); setSel(null); onStatsChange();
+      await loadCands();
+      setCands(c=>c.filter(x=>x.id!==candId&&x.venue_a!==b.id&&x.venue_b!==b.id));
+      setSel(null);
+      onStatsChange();
     } catch(e){showToast(e.message,'error');} finally{setMerging(false);}
   };
 
@@ -1065,7 +1134,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
             <Badge color={cands.length?'warning':'default'}>{cands.length} shown / {totalPending} pending</Badge>
           </div> */}
           <Btn variant="primary" size="sm" onClick={runScan} disabled={computing} style={{ width:'100%' }}>
-            {computing?<><Spinner size={12} color="#fff"/> Scanning…</>:'🔍 Scan for duplicates'}
+            {computing?<><Spinner size={12} color="#fff"/> Rebuilding…</>:'🔁 Rebuild duplicate queue'}
           </Btn>
           <div style={{ fontSize:11,color:'var(--text-muted)',lineHeight:1.5 }}>Venues within 150m with similar names</div>
         </div>
