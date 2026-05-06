@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import AssemblWordmark from '../src/assets/wordmark.svg?react'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
@@ -80,18 +81,32 @@ const SB_URL = 'https://mizoxinvfikwznywuknp.supabase.co';
 const SB_KEY = 'sb_publishable_MNjb4nCCYJ-aDZhJCmcu7Q_yPO05yN2';
 
 async function sb(method, sbPath, body) {
-  const token = window.__adminToken || SB_KEY;
-  const headers = {
-    apikey: SB_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+  const doRequest = async () => {
+    const token = window.__adminToken || SB_KEY;
+    const headers = {
+      apikey: SB_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+    };
+    if (method === 'POST')  headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
+    if (method === 'PATCH') headers['Prefer'] = 'return=representation';
+    if (method === 'GET')   headers['Prefer'] = 'count=exact';
+    const res = await fetch(`${SB_URL}/rest/v1/${sbPath}`, {
+      method, headers, body: body ? JSON.stringify(body) : undefined,
+    });
+    const total = res.headers.get('content-range')?.split('/')[1];
+    const errBody = res.ok ? null : await res.json().catch(() => ({}));
+    return { res, total, errBody };
   };
-  if (method === 'POST')  headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
-  if (method === 'PATCH') headers['Prefer'] = 'return=representation';
-  if (method === 'GET')   headers['Prefer'] = 'count=exact';
-  const res = await fetch(`${SB_URL}/rest/v1/${sbPath}`, {
-    method, headers, body: body ? JSON.stringify(body) : undefined,
-  });
-  const total = res.headers.get('content-range')?.split('/')[1];
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `${method} ${sbPath} → ${res.status}`); }
+
+  let { res, total, errBody } = await doRequest();
+  const errMsg = `${errBody?.message || errBody?.error_description || ''}`.toLowerCase();
+  const shouldTryRefresh = !res.ok && (res.status === 401 || errMsg.includes('jwt expired'));
+
+  if (shouldTryRefresh && typeof window.__refreshAdminSession === 'function') {
+    const refreshed = await window.__refreshAdminSession();
+    if (refreshed) ({ res, total, errBody } = await doRequest());
+  }
+
+  if (!res.ok) throw new Error(errBody?.message || errBody?.error_description || `${method} ${sbPath} → ${res.status}`);
   const data = await res.json().catch(() => null);
   return { data, total: total ? parseInt(total) : undefined };
 }
@@ -108,6 +123,17 @@ async function sbAuth(path, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error_description || data.msg || `Auth error ${res.status}`);
+  return data;
+}
+
+async function refreshSession(refreshToken) {
+  const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.msg || `Auth refresh error ${res.status}`);
   return data;
 }
 
@@ -128,6 +154,35 @@ function useAuth() {
       window.__adminToken = null;
     }
   }, [session?.access_token]);
+
+  useEffect(() => {
+    let inflight = null;
+    window.__refreshAdminSession = async () => {
+      if (inflight) return inflight;
+      inflight = (async () => {
+        const current = session || (() => { try { return JSON.parse(sessionStorage.getItem('admin_session') || 'null'); } catch { return null; } })();
+        if (!current?.refresh_token) return false;
+        try {
+          const next = await refreshSession(current.refresh_token);
+          if (next?.access_token) {
+            sessionStorage.setItem('admin_session', JSON.stringify(next));
+            setSession(next);
+            return true;
+          }
+          return false;
+        } catch {
+          sessionStorage.removeItem('admin_session');
+          window.__adminToken = null;
+          setSession(null);
+          return false;
+        } finally {
+          inflight = null;
+        }
+      })();
+      return inflight;
+    };
+    return () => { window.__refreshAdminSession = null; };
+  }, [session]);
 
   const sendOtp = async (email) => {
     await sbAuth('otp', { email, create_user: false });
@@ -302,7 +357,7 @@ function LoginScreen({ onSendOtp, onVerifyOtp }) {
   return (
     <div style={{ minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'radial-gradient(ellipse at 50% 0%, rgba(232,98,42,0.1) 0%, transparent 65%), var(--bg-base)' }}>
       <div style={{ background:'var(--bg-surface)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-xl)',padding:'40px 36px',width:380,animation:'slideUp 300ms ease both' }}>
-        <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:26,backgroundImage:'var(--color-brand-gradient)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:4 }}>assembl</div>
+        <AssemblWordmark style={{ width:100, height:22, marginBottom:4 }} />
         <div style={{ fontFamily:'var(--font-display)',fontWeight:700,fontSize:17,marginBottom:6 }}>Admin Console</div>
 
         {stage === 'email' ? <>
@@ -342,8 +397,8 @@ function AppShell({ who, active, setActive, stats, onLogout, children }) {
   return (
     <div style={{ display:'flex',height:'100vh',overflow:'hidden' }}>
       <div style={{ width:'var(--sidebar-w)',flexShrink:0,background:'var(--bg-surface)',borderRight:'1px solid var(--border-subtle)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
-        <div style={{ padding:'20px 20px 16px',borderBottom:'1px solid var(--border-subtle)', textAlign:'left' }}>
-          <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:20,backgroundImage:'var(--color-brand-gradient)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>assembl</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding:'20px 20px 16px',borderBottom:'1px solid var(--border-subtle)', textAlign:'left' }}>
+          <AssemblWordmark style={{ width:100, height:22, marginBottom:4 }} />
           <div style={{ fontSize:11,color:'var(--text-muted)',marginTop:2,fontWeight:600,letterSpacing:'0.05em' }}>ADMIN CONSOLE</div>
         </div>
         <nav style={{ flex:1,padding:'12px 10px',overflowY:'auto' }}>
@@ -368,7 +423,7 @@ function AppShell({ who, active, setActive, stats, onLogout, children }) {
         </div>
       </div>
       <div style={{ flex:1,overflow:'hidden',display:'flex',flexDirection:'column' }}>
-        <div style={{ padding:'14px 24px',borderBottom:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',background:'var(--bg-surface)',flexShrink:0 }}>
+        <div style={{ padding:'14px 24px',borderBottom:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',background:'var(--bg-surface)',flexShrink:0, textAlign:'left' }}>
           <div>
             <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:17 }}>{NAV.find(n=>n.id===active)?.icon} {NAV.find(n=>n.id===active)?.label}</div>
             <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:1 }}>{NAV.find(n=>n.id===active)?.desc}</div>
@@ -631,7 +686,7 @@ function VenuesSection({ who, allFeatures, showToast, onStatsChange }) {
             <Inp value={search} onChange={setSearch} placeholder="Search venues…" style={{ flex:1,maxWidth:300 }} />
             <Sel value={fCat} onChange={setFCat}><option value="">All categories</option>{CAT_OPTS.map(c=><option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}</Sel>
             <Sel value={fBorough} onChange={setFBorough}><option value="">All boroughs</option>{boroughs.map(b=><option key={b} value={b}>{b}</option>)}</Sel>
-            <Btn variant="ghost" size="sm" onClick={load} title="Refresh">↺</Btn>
+            <Btn variant="ghost" size="sm" onClick={load} title="Refresh" style={{ fontSize:23 }}>↺</Btn>
           </div>
           <div style={{ display:'flex',gap:6,alignItems:'center' }}>
             {STATUS_TABS.map(f=>(
