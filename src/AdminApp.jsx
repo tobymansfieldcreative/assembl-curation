@@ -780,7 +780,7 @@ function VenuesSection({ who, allFeatures, showToast, onStatsChange }) {
 
 // ─── TRIAGE (FLAGGED RESOLUTION) SECTION ─────────────────────────────────────
 function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
-  const [queue,setQueue]=useState([]), [idx,setIdx]=useState(0), [loading,setLoading]=useState(true), [saving,setSaving]=useState(false), [editOpen,setEditOpen]=useState(false), [imgIdx,setImgIdx]=useState(0);
+  const [queue,setQueue]=useState([]), [idx,setIdx]=useState(0), [loading,setLoading]=useState(true), [saving,setSaving]=useState(false), [editOpen,setEditOpen]=useState(false), [galleryOpen,setGalleryOpen]=useState(false), [galleryIdx,setGalleryIdx]=useState(0);
 
   useEffect(()=>{
     (async()=>{
@@ -801,11 +801,11 @@ function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
       await sb('PATCH',`venues?id=eq.${cur.id}`,{ curation_status:status||null, curation_updated_at:new Date().toISOString(), curation_updated_by:who||'admin' });
       setQueue(q=>q.filter(v=>v.id!==cur.id));
       setIdx(i=>Math.min(i,queue.length-2));
-      setImgIdx(0); onStatsChange();
+      setGalleryIdx(0); onStatsChange();
     } catch(e){ showToast(e.message,'error'); } finally { setSaving(false); }
   };
 
-  const skip = () => { setIdx(i=>(i+1)%queue.length); setImgIdx(0); };
+  const skip = () => { setIdx(i=>(i+1)%queue.length); setGalleryIdx(0); };
 
   useEffect(()=>{
     const h = e => {
@@ -813,11 +813,10 @@ function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
       if (e.key==='k') resolve(null);
       if (e.key==='d') resolve('deleted');
       if (e.key==='ArrowRight'||e.key==='l') skip();
-      if (e.key==='ArrowLeft'&&imgIdx>0) setImgIdx(i=>i-1);
-      if (e.key==='ArrowRight'&&imgIdx<images.length-1) setImgIdx(i=>i+1);
+      if (e.key==='e') setEditOpen(true);
     };
     window.addEventListener('keydown',h); return ()=>window.removeEventListener('keydown',h);
-  },[cur,imgIdx,queue.length,images.length]);
+  },[cur,queue.length]);
 
   if (loading) return <div style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:12 }}><Spinner/><span style={{ color:'var(--text-muted)' }}>Loading flagged venues…</span></div>;
   if (!queue.length) return (
@@ -830,78 +829,81 @@ function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
 
   return (
     <div style={{ flex:1,display:'flex',overflow:'hidden' }}>
-      <div style={{ flex:1,display:'flex',overflow:'hidden' }}>
-        {/* Image pane */}
-        <div style={{ flex:'0 0 50%',position:'relative',background:'var(--bg-base)',overflow:'hidden' }}>
-          {!images.length ? (
-            <div style={{ height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12,color:'var(--text-muted)' }}><div style={{ fontSize:48,opacity:.3 }}>📷</div><div style={{ fontSize:14 }}>No images</div></div>
-          ) : <>
-            <img key={images[imgIdx]} src={images[imgIdx]} alt="" style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }} />
-            {images.length>1 && <>
-              <div style={{ position:'absolute',bottom:16,left:'50%',transform:'translateX(-50%)',display:'flex',gap:6 }}>
-                {images.map((_,i)=><div key={i} onClick={()=>setImgIdx(i)} style={{ width:i===imgIdx?20:6,height:6,borderRadius:3,background:i===imgIdx?'#fff':'rgba(255,255,255,0.4)',cursor:'pointer',transition:'all 0.2s' }} />)}
-              </div>
-              <div style={{ position:'absolute',bottom:16,right:16,background:'rgba(0,0,0,0.55)',borderRadius:4,padding:'2px 8px',fontSize:11,color:'rgba(255,255,255,0.85)' }}>{imgIdx+1}/{images.length}</div>
-              {imgIdx>0 && <button onClick={()=>setImgIdx(i=>i-1)} style={{ position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',background:'rgba(0,0,0,0.5)',border:'none',borderRadius:'50%',width:36,height:36,color:'#fff',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>‹</button>}
-              {imgIdx<images.length-1 && <button onClick={()=>setImgIdx(i=>i+1)} style={{ position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'rgba(0,0,0,0.5)',border:'none',borderRadius:'50%',width:36,height:36,color:'#fff',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>›</button>}
-            </>}
-          </>}
-          <div style={{ position:'absolute',top:16,left:16 }}>
-            <div style={{ background:'rgba(0,0,0,0.6)',borderRadius:'var(--radius-full)',padding:'4px 12px',fontSize:12,fontWeight:700,color:'#fff',fontFamily:'var(--font-display)' }}>{idx+1} / {queue.length} in queue</div>
+      <div style={{ flex:1,display:'flex',flexDirection:'column',overflow:'hidden',textAlign:'left' }}>
+      <div style={{ padding:'14px 24px',borderBottom:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12 }}>
+        <div style={{ display:'flex',flexDirection:'column',gap:4 }}>
+          <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:16 }}>{idx+1} / {queue.length} in queue</div>
+          <div style={{ fontSize:12,color:'var(--text-muted)' }}>K = restore · D = delete · L = skip · E = edit</div>
+        </div>
+        <Btn variant="primary" onClick={()=>setEditOpen(true)}>✎ Edit details</Btn>
+      </div>
+
+      <div style={{ flex:1,display:'grid',gridTemplateColumns:'1.1fr 0.9fr',gap:0,overflow:'hidden' }}>
+        <div style={{ overflowY:'auto',padding:'24px 28px 20px',borderRight:'1px solid var(--border-subtle)' }}>
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:28,lineHeight:1.12,marginBottom:10,textAlign:'left' }}>{cur.name}</div>
+            <div style={{ display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',textAlign:'left' }}>
+              {cur.category && <Badge color="default">{cur.category.replace(/_/g,' ')}</Badge>}
+              {cur.borough && <span style={{ fontSize:13,color:'var(--text-muted)' }}>{cur.borough}</span>}
+              {cur.locality && cur.locality!==cur.borough && <span style={{ fontSize:13,color:'var(--text-muted)' }}>{cur.locality}</span>}
+              {cur.features_stale && <Badge color="warning">⚠ stale features</Badge>}
+            </div>
           </div>
+
+          {cur.description && (
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8,fontFamily:'var(--font-display)' }}>Description</div>
+              <p style={{ fontSize:14,color:'var(--text-secondary)',lineHeight:1.65,textAlign:'left' }}>{cur.description}</p>
+            </div>
+          )}
+
+          {featureLabels.length>0 && (
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8,fontFamily:'var(--font-display)' }}>Features</div>
+              <div style={{ display:'flex',flexWrap:'wrap',gap:5 }}>{featureLabels.map(f=><Badge key={f}>{f}</Badge>)}</div>
+            </div>
+          )}
+
+          {(cur.verified_url||cur.website) && (
+            <a href={cur.verified_url||cur.website} target="_blank" rel="noopener noreferrer"
+              style={{ display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'var(--color-brand)',textDecoration:'none' }}>
+              🌐 {(cur.verified_url||cur.website).replace(/^https?:\/\//,'')}
+            </a>
+          )}
         </div>
 
-        {/* Info + actions */}
-        <div style={{ flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:'var(--bg-surface)' }}>
-          <div style={{ flex:1,overflowY:'auto',padding:'32px 32px 16px' }}>
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:26,lineHeight:1.15,marginBottom:8 }}>{cur.name}</div>
-              <div style={{ display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' }}>
-                {cur.category && <Badge color="default">{cur.category.replace(/_/g,' ')}</Badge>}
-                {cur.borough && <span style={{ fontSize:13,color:'var(--text-muted)' }}>{cur.borough}</span>}
-                {cur.locality && cur.locality!==cur.borough && <span style={{ fontSize:13,color:'var(--text-muted)' }}>· {cur.locality}</span>}
-                {cur.features_stale && <Badge color="warning">⚠ stale features</Badge>}
+        <div style={{ display:'flex',flexDirection:'column',overflow:'hidden' }}>
+          <div style={{ padding:'16px 18px 10px' }}>
+            <div style={{ fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8,fontFamily:'var(--font-display)' }}>Images ({images.length})</div>
+            {!images.length ? (
+              <div style={{ border:'1px dashed var(--border-default)',borderRadius:'var(--radius-md)',padding:'24px 16px',color:'var(--text-muted)',fontSize:13,textAlign:'left' }}>No images for this venue</div>
+            ) : (
+              <div style={{ display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8,maxHeight:'calc(100vh - 280px)',overflowY:'auto',paddingRight:2 }}>
+                {images.map((url,i)=>(
+                  <button key={url+i} onClick={()=>{setGalleryIdx(i);setGalleryOpen(true);}} style={{ border:'1px solid var(--border-default)',borderRadius:'var(--radius-sm)',overflow:'hidden',background:'var(--bg-elevated)',aspectRatio:'4/3',padding:0,cursor:'pointer' }}>
+                    <img src={url} alt="" style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }} />
+                  </button>
+                ))}
               </div>
-            </div>
-
-            {cur.description && (
-              <p style={{ fontSize:14,color:'var(--text-secondary)',lineHeight:1.65,marginBottom:20,borderLeft:'2px solid var(--border-default)',paddingLeft:14 }}>{cur.description}</p>
-            )}
-
-            {featureLabels.length>0 && (
-              <div style={{ marginBottom:20 }}>
-                <div style={{ fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8,fontFamily:'var(--font-display)' }}>Features</div>
-                <div style={{ display:'flex',flexWrap:'wrap',gap:5 }}>{featureLabels.map(f=><Badge key={f}>{f}</Badge>)}</div>
-              </div>
-            )}
-
-            {(cur.verified_url||cur.website) && (
-              <a href={cur.verified_url||cur.website} target="_blank" rel="noopener noreferrer"
-                style={{ display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'var(--color-brand)',textDecoration:'none' }}>
-                🌐 {(cur.verified_url||cur.website).replace(/^https?:\/\//,'')}
-              </a>
             )}
           </div>
 
-          <div style={{ padding:'20px 32px 28px',borderTop:'1px solid var(--border-subtle)',display:'flex',flexDirection:'column',gap:10 }}>
-            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
-              <button onClick={()=>resolve(null)} disabled={saving} style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:6,padding:'16px 12px',borderRadius:'var(--radius-lg)',border:'1.5px solid rgba(16,185,129,0.4)',background:'rgba(16,185,129,0.1)',color:'#10B981',cursor:saving?'not-allowed':'pointer',opacity:saving?.5:1,transition:'all var(--transition-base)',fontFamily:'var(--font-display)' }}>
-                <span style={{ fontSize:22 }}>✓</span>
-                <span style={{ fontSize:14,fontWeight:700 }}>Restore</span>
-                <span style={{ fontSize:10,opacity:.5,fontWeight:600 }}>K</span>
-              </button>
-              <button onClick={()=>resolve('deleted')} disabled={saving} style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:6,padding:'16px 12px',borderRadius:'var(--radius-lg)',border:'1.5px solid rgba(239,68,68,0.4)',background:'rgba(239,68,68,0.1)',color:'#EF4444',cursor:saving?'not-allowed':'pointer',opacity:saving?.5:1,transition:'all var(--transition-base)',fontFamily:'var(--font-display)' }}>
-                <span style={{ fontSize:22 }}>✕</span>
-                <span style={{ fontSize:14,fontWeight:700 }}>Delete</span>
-                <span style={{ fontSize:10,opacity:.5,fontWeight:600 }}>D</span>
-              </button>
-            </div>
-            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8 }}>
-              <Btn variant="default" onClick={skip}>Skip <span style={{ opacity:.4,fontSize:11 }}>→</span></Btn>
-              <Btn variant="default" onClick={()=>setEditOpen(true)}>✎ Edit details</Btn>
+          <div style={{ marginTop:'auto',padding:'14px 18px 18px',borderTop:'1px solid var(--border-subtle)',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
+            <button onClick={()=>resolve(null)} disabled={saving} style={{ display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4,padding:'14px 12px',borderRadius:'var(--radius-lg)',border:'1.5px solid rgba(16,185,129,0.4)',background:'rgba(16,185,129,0.1)',color:'#10B981',cursor:saving?'not-allowed':'pointer',opacity:saving?.5:1,transition:'all var(--transition-base)',fontFamily:'var(--font-display)',textAlign:'left' }}>
+              <span style={{ fontSize:14,fontWeight:700 }}>✓ Restore</span>
+              <span style={{ fontSize:11,opacity:.7,fontWeight:600 }}>Keep this venue in app (K)</span>
+            </button>
+            <button onClick={()=>resolve('deleted')} disabled={saving} style={{ display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4,padding:'14px 12px',borderRadius:'var(--radius-lg)',border:'1.5px solid rgba(239,68,68,0.4)',background:'rgba(239,68,68,0.1)',color:'#EF4444',cursor:saving?'not-allowed':'pointer',opacity:saving?.5:1,transition:'all var(--transition-base)',fontFamily:'var(--font-display)',textAlign:'left' }}>
+              <span style={{ fontSize:14,fontWeight:700 }}>✕ Delete</span>
+              <span style={{ fontSize:11,opacity:.7,fontWeight:600 }}>Hide this venue from app (D)</span>
+            </button>
+            <div style={{ gridColumn:'1/3' }}>
+              <Btn variant="default" onClick={skip} style={{ width:'100%',justifyContent:'space-between' }}>Skip <span style={{ opacity:.5,fontSize:11 }}>→ Next (L)</span></Btn>
             </div>
           </div>
         </div>
+      </div>
+
       </div>
 
       {editOpen && <VenueDrawer venue={cur} allFeatures={allFeatures} who={who} onClose={()=>setEditOpen(false)}
@@ -913,6 +915,23 @@ function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
         }}
         onDeleted={id=>{setQueue(q=>q.filter(v=>v.id!==id)); setEditOpen(false); onStatsChange();}}
         showToast={showToast} />}
+
+      <Modal open={galleryOpen} onClose={()=>setGalleryOpen(false)} title={`Venue images (${images.length})`} width={920}>
+        {!images.length ? <div style={{ color:'var(--text-muted)',fontSize:13,textAlign:'left' }}>No images</div> : (
+          <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
+            <div style={{ border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',overflow:'hidden',background:'var(--bg-base)' }}>
+              <img src={images[galleryIdx]} alt="" style={{ width:'100%',maxHeight:'60vh',objectFit:'contain',display:'block' }} />
+            </div>
+            <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(90px,1fr))',gap:8 }}>
+              {images.map((url,i)=>(
+                <button key={url+i} onClick={()=>setGalleryIdx(i)} style={{ border:i===galleryIdx?'2px solid var(--color-brand)':'1px solid var(--border-default)',borderRadius:'var(--radius-sm)',overflow:'hidden',padding:0,background:'var(--bg-elevated)' }}>
+                  <img src={url} alt="" style={{ width:'100%',height:70,objectFit:'cover',display:'block' }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
