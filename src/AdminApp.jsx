@@ -371,7 +371,7 @@ function LoginScreen({ onSendOtp, onVerifyOtp }) {
         </> : <>
           <div style={{ color:'var(--text-muted)',fontSize:13,marginBottom:6 }}>Code sent to</div>
           <div style={{ fontFamily:'var(--font-display)',fontWeight:600,fontSize:14,color:'var(--text-primary)',marginBottom:24 }}>{email}</div>
-          <Inp value={token} onChange={setToken} type="text" placeholder="6-digit code" autoFocus
+          <Inp value={token} onChange={setToken} type="text" placeholder="8-digit code" autoFocus
             onKeyDown={e=>e.key==='Enter'&&handleVerify()} style={{ marginBottom:12,letterSpacing:'0.2em',fontSize:18,textAlign:'center' }} />
           {err && <div style={{ color:'#EF4444',fontSize:12,marginBottom:10,fontFamily:'var(--font-display)' }}>{err}</div>}
           <Btn variant="primary" size="lg" onClick={handleVerify} disabled={loading||!token} style={{ width:'100%',marginBottom:10 }}>
@@ -1096,7 +1096,7 @@ function RefSection({ showToast }) {
   useEffect(()=>{ loadFeatureOpts(); },[]);
 
   const openEdit = row => { setEditing(row.slug||row.id); setDraft({...row}); setIsNew(false); };
-  const openNew  = () => { setEditing('__new__'); setIsNew(true); setDraft(tab==='features'?{slug:'',label:'',icon:'',ratable:false,must_haveable:false,question:'',occasions:[]}:{slug:'',label:'',icon:'',description:'',is_primary:true,in_onboarding:true,sort_order:0,default_must_haves:[]}); };
+  const openNew  = () => { setEditing('__new__'); setIsNew(true); setDraft(tab==='features'?{slug:'',label:'',icon:'',category:'general',ratable:false,must_haveable:false,question:'',occasions:[]}:{slug:'',label:'',icon:'',description:'',is_primary:true,in_onboarding:true,sort_order:0,default_must_haves:[]}); };
 
   const save = async () => {
     setSaving(true);
@@ -1137,7 +1137,7 @@ function RefSection({ showToast }) {
           : tab==='features' ? (
             <table style={{ width:'100%',borderCollapse:'collapse' }}>
               <thead><tr style={{ position:'sticky',top:0,background:'var(--bg-surface)',zIndex:1 }}>
-                {['Slug','Label','Icon','Ratable','Must-have','Occasions',''].map(h=><th key={h} style={{ padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:'var(--font-display)',borderBottom:'1px solid var(--border-subtle)',whiteSpace:'nowrap' }}>{h}</th>)}
+                {['Slug','Label','Icon','Category','Ratable','Must-have','Occasions',''].map(h=><th key={h} style={{ padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:'var(--font-display)',borderBottom:'1px solid var(--border-subtle)',whiteSpace:'nowrap' }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {features.map((f,i)=>(
@@ -1146,6 +1146,7 @@ function RefSection({ showToast }) {
                     <td style={{ padding:'9px 14px',fontSize:12,fontFamily:'monospace',color:'var(--text-muted)' }}>{f.slug}</td>
                     <td style={{ padding:'9px 14px',fontSize:13,fontWeight:600 }}>{f.label}</td>
                     <td style={{ padding:'9px 14px',fontSize:12,color:'var(--text-muted)' }}>{f.icon||'—'}</td>
+                    <td style={{ padding:'9px 14px',fontSize:12,color:'var(--text-secondary)' }}>{(f.category||'general').replace(/_/g,' ')}</td>
                     <td style={{ padding:'9px 14px' }}>{f.ratable?<Badge color="success">Yes</Badge>:<span style={{ color:'var(--text-muted)',fontSize:12 }}>—</span>}</td>
                     <td style={{ padding:'9px 14px' }}>{(f.must_haveable||f.mustHaveable)?<Badge color="info">Yes</Badge>:<span style={{ color:'var(--text-muted)',fontSize:12 }}>—</span>}</td>
                     <td style={{ padding:'9px 14px' }}><div style={{ display:'flex',flexWrap:'wrap',gap:3 }}>{(Array.isArray(f.occasions)?f.occasions:(f.occasions||'').split(',').filter(Boolean)).map(o=><Badge key={o}>{o}</Badge>)}</div></td>
@@ -1197,6 +1198,14 @@ function RefSection({ showToast }) {
               <FRow label="Slug" hint="snake_case, immutable"><Inp value={draft.slug||''} onChange={setD('slug')} placeholder="e.g. craft_beer" style={{ fontFamily:'monospace',fontSize:13 }} /></FRow>
               <FRow label="Label"><Inp value={draft.label||''} onChange={setD('label')} placeholder="Display name" /></FRow>
               <FRow label="Icon" hint="Phosphor icon name"><Inp value={draft.icon||''} onChange={setD('icon')} placeholder="e.g. BeerStein" /></FRow>
+              <FRow label="Category">
+                <Sel value={draft.category||'general'} onChange={setD('category')}>
+                  <option value="general">general</option>
+                  <option value="cuisine">cuisine</option>
+                  <option value="food_offering">food offering</option>
+                  <option value="dietary">dietary</option>
+                </Sel>
+              </FRow>
               <FRow label="Question" hint="Shown when rating"><Inp value={draft.question||''} onChange={setD('question')} placeholder="Was there craft beer?" rows={2} /></FRow>
               <FRow label="Occasions" hint="Comma-separated slugs"><Inp value={Array.isArray(draft.occasions)?draft.occasions.join(','):(draft.occasions||'')} onChange={v=>setD('occasions')(v.split(',').map(s=>s.trim()).filter(Boolean))} placeholder="drinks,sunday,bignight" /></FRow>
               <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
