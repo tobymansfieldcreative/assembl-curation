@@ -276,10 +276,10 @@ function Btn({ children, variant='default', size='md', onClick, disabled, style:
   return <button onClick={disabled?undefined:onClick} title={title} style={{...base,...(V[variant]||V.default),...s}}>{children}</button>;
 }
 
-function Inp({ value, onChange, placeholder, type='text', style:s, rows, autoFocus, onKeyDown }) {
+function Inp({ value, onChange, placeholder, type='text', style:s, rows, autoFocus, onKeyDown, disabled=false }) {
   const base = { padding:'8px 12px',width:'100%',background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-sm)',color:'var(--text-primary)',fontSize:14,...s };
-  if (rows) return <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...base,resize:'vertical',lineHeight:1.5}} />;
-  return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} onKeyDown={onKeyDown} style={base} />;
+  if (rows) return <textarea disabled={disabled} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...base,resize:'vertical',lineHeight:1.5,opacity:disabled?0.7:1,cursor:disabled?'not-allowed':'text'}} />;
+  return <input disabled={disabled} type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} onKeyDown={onKeyDown} style={{...base,opacity:disabled?0.7:1,cursor:disabled?'not-allowed':'text'}} />;
 }
 
 function Sel({ value, onChange, children, style:s }) {
@@ -919,7 +919,7 @@ function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
 
 // ─── DUPLICATES SECTION ───────────────────────────────────────────────────────
 function DupesSection({ who, showToast, onStatsChange }) {
-  const [cands,setCands]=useState([]), [totalPending,setTotalPending]=useState(0), [computing,setComputing]=useState(false), [sel,setSel]=useState(null), [choices,setChoices]=useState({}), [customValues,setCustomValues]=useState({}), [merging,setMerging]=useState(false);
+  const [cands,setCands]=useState([]), [totalPending,setTotalPending]=useState(0), [computing,setComputing]=useState(false), [sel,setSel]=useState(null), [choices,setChoices]=useState({}), [customValues,setCustomValues]=useState({}), [merging,setMerging]=useState(false), [deletingBoth,setDeletingBoth]=useState(false);
 
   const loadCands = async () => {
     try {
@@ -1012,6 +1012,25 @@ function DupesSection({ who, showToast, onStatsChange }) {
     } catch(e){showToast(e.message,'error');} finally{setMerging(false);}
   };
 
+  const deleteBoth = async () => {
+    if (!sel || deletingBoth) return;
+    const { a, b, candId } = sel;
+    if (!confirm(`Delete both venues?\n\n"${a.name}" and "${b.name}" will be marked deleted and hidden.`)) return;
+    setDeletingBoth(true);
+    try {
+      const stamp = { curation_status:'deleted', curation_updated_at:new Date().toISOString(), curation_updated_by:who||'admin' };
+      await Promise.all([
+        sb('PATCH',`venues?id=eq.${a.id}`,{ ...stamp, curation_notes:`Deleted during duplicate review (${candId})` }),
+        sb('PATCH',`venues?id=eq.${b.id}`,{ ...stamp, curation_notes:`Deleted during duplicate review (${candId})` }),
+      ]);
+      await sb('PATCH',`duplicate_candidates?id=eq.${candId}`,{status:'dismissed'});
+      showToast('Both venues marked as deleted');
+      setCands(c=>c.filter(x=>x.id!==candId));
+      setSel(null);
+      onStatsChange();
+    } catch(e){ showToast(e.message,'error'); } finally { setDeletingBoth(false); }
+  };
+
   const FIELDS = ['name','category','description','borough','locality','address','verified_url','booking_url','phone'];
 
   return (
@@ -1026,12 +1045,13 @@ function DupesSection({ who, showToast, onStatsChange }) {
           <Btn variant="primary" size="sm" onClick={runScan} disabled={computing} style={{ width:'100%' }}>
             {computing?<><Spinner size={12} color="#fff"/> Scanning…</>:'🔍 Scan for duplicates'}
           </Btn>
-          <div style={{ fontSize:11,color:'var(--text-muted)',lineHeight:1.5 }}>Finds venues within 150m with similar names. Stores results in <code style={{ fontSize:10,background:'var(--bg-elevated)',padding:'1px 4px',borderRadius:3 }}>duplicate_candidates</code>.</div>
+          <div style={{ fontSize:11,color:'var(--text-muted)',lineHeight:1.5 }}>Venues within 150m with similar names</div>
         </div>
         <div style={{ flex:1,overflowY:'auto' }}>
           {!cands.length ? <div style={{ padding:24,textAlign:'center',color:'var(--text-muted)',fontSize:13 }}>Run a scan to detect candidates</div>
           : cands.map(c=>{
             const aName=c.venueAData?.name||c.venue_a, bName=c.venueBData?.name||c.venue_b, isSel=sel?.candId===c.id;
+            const simPct = Math.round(c.similarity_score*100);
             return (
               <div key={c.id} onClick={()=>openMerge(c)} style={{ padding:'12px 16px',cursor:'pointer',background:isSel?'rgba(232,98,42,0.07)':'transparent',borderBottom:'1px solid var(--border-subtle)',transition:'background var(--transition-base)' }}
                 onMouseEnter={e=>{if(!isSel)e.currentTarget.style.background='var(--bg-hover)';}}
@@ -1040,7 +1060,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
                 <div style={{ fontSize:11,color:'var(--text-muted)',marginBottom:3 }}>vs</div>
                 <div style={{ fontSize:13,fontWeight:600,marginBottom:8 }}>{bName}</div>
                 <div style={{ display:'flex',gap:5, justifyContent:'center' }}>
-                  <Badge color={c.similarity_score>.9?'error':c.similarity_score>.8?'warning':'default'}>{Math.round(c.similarity_score*100)}% similar</Badge>
+                  {simPct<100 && <Badge color={c.similarity_score>.9?'error':c.similarity_score>.8?'warning':'default'}>{simPct}% similar</Badge>}
                   <Badge color="default">{Math.round(c.distance_metres)}m</Badge>
                 </div>
               </div>
@@ -1061,8 +1081,11 @@ function DupesSection({ who, showToast, onStatsChange }) {
               <div style={{ fontFamily:'var(--font-display)',fontWeight:700,fontSize:15 }}>Merge Review</div>
               <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:2 }}>Click a cell to choose which value wins. Venue A is always kept.</div>
             </div>
-            <Btn variant="ghost" size="sm" onClick={()=>dismiss(sel.candId)}>Not a duplicate</Btn>
-            <Btn variant="primary" size="sm" onClick={merge} disabled={merging}>{merging?<><Spinner size={12} color="#fff"/> Merging…</>:'⚡ Merge'}</Btn>
+            <Btn variant="ghost" size="sm" onClick={()=>dismiss(sel.candId)} disabled={merging||deletingBoth}>Not a duplicate</Btn>
+            <Btn variant="danger" size="sm" onClick={deleteBoth} disabled={merging||deletingBoth}>
+              {deletingBoth?<><Spinner size={12} color="#EF4444"/> Deleting…</>:'🗑 Delete both venues'}
+            </Btn>
+            <Btn variant="primary" size="sm" onClick={merge} disabled={merging||deletingBoth}>{merging?<><Spinner size={12} color="#fff"/> Merging…</>:'⚡ Merge'}</Btn>
           </div>
           <div style={{ flex:1,overflowY:'auto',padding:24 }}>
             <div style={{ display:'grid',gridTemplateColumns:'130px 1fr 1fr',gap:10,marginBottom:14 }}>
@@ -1134,7 +1157,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
 
 // ─── REFERENCE DATA SECTION ───────────────────────────────────────────────────
 function RefSection({ showToast }) {
-  const [tab,setTab]=useState('features'), [features,setFeatures]=useState([]), [featureOpts,setFeatureOpts]=useState([]), [occasions,setOccasions]=useState([]), [loading,setLoading]=useState(false), [editing,setEditing]=useState(null), [draft,setDraft]=useState({}), [saving,setSaving]=useState(false), [isNew,setIsNew]=useState(false);
+  const [tab,setTab]=useState('features'), [features,setFeatures]=useState([]), [featureOpts,setFeatureOpts]=useState([]), [occasions,setOccasions]=useState([]), [loading,setLoading]=useState(false), [editing,setEditing]=useState(null), [draft,setDraft]=useState({}), [saving,setSaving]=useState(false), [isNew,setIsNew]=useState(false), [featureUsageCount,setFeatureUsageCount]=useState(0), [featureUsageLoading,setFeatureUsageLoading]=useState(false);
 
   const loadF = async () => { setLoading(true); try { const{data}=await sb('GET','feature_definitions?select=*&order=label.asc'); setFeatures(Array.isArray(data)?data:[]); } catch(e){showToast(e.message,'error');} finally{setLoading(false);} };
   const loadO = async () => { setLoading(true); try { const{data}=await sb('GET','occasion_definitions?select=*&order=sort_order.asc'); setOccasions(Array.isArray(data)?data:[]); } catch(e){showToast(e.message,'error');} finally{setLoading(false);} };
@@ -1146,6 +1169,29 @@ function RefSection({ showToast }) {
   };
   useEffect(()=>{ if(tab==='features')loadF(); else loadO(); },[tab]);
   useEffect(()=>{ loadFeatureOpts(); },[]);
+  useEffect(()=>{
+    if (tab!=='features' || !editing || isNew || !draft?.slug) { setFeatureUsageCount(0); setFeatureUsageLoading(false); return; }
+    let cancelled=false;
+    (async()=>{
+      setFeatureUsageLoading(true);
+      try {
+        let total=0;
+        for (let off=0;;off+=1000) {
+          const { data } = await sb('GET',`venues?select=features&limit=1000&offset=${off}`);
+          const rows = Array.isArray(data) ? data : [];
+          if (!rows.length) break;
+          total += rows.filter(v=>parseSlugs(v.features).includes(draft.slug)).length;
+          if (rows.length<1000) break;
+        }
+        if (!cancelled) setFeatureUsageCount(total);
+      } catch {
+        if (!cancelled) setFeatureUsageCount(0);
+      } finally {
+        if (!cancelled) setFeatureUsageLoading(false);
+      }
+    })();
+    return ()=>{ cancelled=true; };
+  },[tab,editing,isNew,draft?.slug]);
 
   const openEdit = row => { setEditing(row.slug||row.id); setDraft({...row}); setIsNew(false); };
   const openNew  = () => { setEditing('__new__'); setIsNew(true); setDraft(tab==='features'?{slug:'',label:'',icon:'',category:'general',ratable:false,must_haveable:false,question:'',occasions:[]}:{slug:'',label:'',icon:'',description:'',is_primary:true,in_onboarding:true,sort_order:0,default_must_haves:[]}); };
@@ -1247,7 +1293,12 @@ function RefSection({ showToast }) {
           </div>
           <div style={{ flex:1,overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:14 }}>
             {tab==='features' ? <>
-              <FRow label="Slug" hint="snake_case, immutable"><Inp value={draft.slug||''} onChange={setD('slug')} placeholder="e.g. craft_beer" style={{ fontFamily:'monospace',fontSize:13 }} /></FRow>
+              <FRow label="Slug" hint={isNew?'snake_case':'Immutable after creation'}><Inp value={draft.slug||''} onChange={setD('slug')} placeholder="e.g. craft_beer" style={{ fontFamily:'monospace',fontSize:13 }} disabled={!isNew} /></FRow>
+              {!isNew && (
+                <div style={{ marginTop:-8,fontSize:12,color:'var(--text-success)', textAlign:'left' }}>
+                  {featureUsageLoading ? 'Checking usage…' : `Active on ${featureUsageCount.toLocaleString()} venue${featureUsageCount!==1?'s':''}`}
+                </div>
+              )}
               <FRow label="Label"><Inp value={draft.label||''} onChange={setD('label')} placeholder="Display name" /></FRow>
               <FRow label="Icon" hint="Phosphor icon name"><Inp value={draft.icon||''} onChange={setD('icon')} placeholder="e.g. BeerStein" /></FRow>
               <FRow label="Category">
@@ -1265,7 +1316,7 @@ function RefSection({ showToast }) {
                 <Toggle checked={Boolean(draft.must_haveable??draft.mustHaveable)} onChange={v=>setD('must_haveable')(v)} label="Must-haveable (users can require it)" />
               </div>
             </> : <>
-              <FRow label="Slug" hint="immutable"><Inp value={draft.slug||''} onChange={setD('slug')} placeholder="e.g. drinks" style={{ fontFamily:'monospace',fontSize:13 }} /></FRow>
+              <FRow label="Slug" hint={isNew?'snake_case':'Immutable after creation'}><Inp value={draft.slug||''} onChange={setD('slug')} placeholder="e.g. drinks" style={{ fontFamily:'monospace',fontSize:13 }} disabled={!isNew} /></FRow>
               <FRow label="Label"><Inp value={draft.label||''} onChange={setD('label')} placeholder="Display name" /></FRow>
               <FRow label="Icon" hint="Emoji or icon name"><Inp value={draft.icon||''} onChange={setD('icon')} placeholder="🍸" /></FRow>
               <FRow label="Description"><Inp value={draft.description||''} onChange={setD('description')} placeholder="Brief description…" rows={3} /></FRow>
