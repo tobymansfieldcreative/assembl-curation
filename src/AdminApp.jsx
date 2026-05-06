@@ -464,7 +464,7 @@ function AppShell({ who, active, setActive, stats, onLogout, theme, setTheme, ch
 }
 
 // ─── Image Carousel ───────────────────────────────────────────────────────────
-function ImgCarousel({ images, height=240 }) {
+function ImgCarousel({ images, height=340 }) {
   const [idx,setIdx]=useState(0), [err,setErr]=useState(false);
   const urls=parseImages(images);
   useEffect(()=>{setIdx(0);setErr(false);},[JSON.stringify(urls)]);
@@ -919,7 +919,7 @@ function TriageSection({ who, allFeatures, showToast, onStatsChange }) {
 
 // ─── DUPLICATES SECTION ───────────────────────────────────────────────────────
 function DupesSection({ who, showToast, onStatsChange }) {
-  const [cands,setCands]=useState([]), [totalPending,setTotalPending]=useState(0), [computing,setComputing]=useState(false), [sel,setSel]=useState(null), [choices,setChoices]=useState({}), [merging,setMerging]=useState(false);
+  const [cands,setCands]=useState([]), [totalPending,setTotalPending]=useState(0), [computing,setComputing]=useState(false), [sel,setSel]=useState(null), [choices,setChoices]=useState({}), [customValues,setCustomValues]=useState({}), [merging,setMerging]=useState(false);
 
   const loadCands = async () => {
     try {
@@ -984,6 +984,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
       ['name','description','category','borough','locality','address','verified_url','booking_url','phone'].forEach(k=>{ch[k]=(a[k]?.length||0)>=(b[k]?.length||0)?'a':'b';});
       ch.features='merge'; ch.image_urls='merge';
       setChoices(ch);
+      setCustomValues({});
     } catch(e){showToast(e.message,'error');}
   };
 
@@ -997,7 +998,10 @@ function DupesSection({ who, showToast, onStatsChange }) {
     const{a,b,candId}=sel;
     setMerging(true);
     try {
-      const pick=k=>choices[k]==='b'?b[k]:a[k];
+      const pick=k=>{
+        if (choices[k]==='custom') return customValues[k] ?? '';
+        return choices[k]==='b' ? b[k] : a[k];
+      };
       const merged={ name:pick('name'), description:pick('description'), category:pick('category'), borough:pick('borough'), locality:pick('locality'), address:pick('address'), verified_url:pick('verified_url')||pick('website'), booking_url:pick('booking_url'), phone:pick('phone'), features:choices.features==='merge'?[...new Set([...parseSlugs(a.features),...parseSlugs(b.features)])]:parseSlugs(pick('features')), image_urls:choices.image_urls==='merge'?[...new Set([...parseImages(a.image_urls),...parseImages(b.image_urls)])]:parseImages(pick('image_urls')), curation_updated_at:new Date().toISOString(), curation_updated_by:who||'admin' };
       await sb('PATCH',`venues?id=eq.${a.id}`,merged);
       await sb('PATCH',`venues?id=eq.${b.id}`,{curation_status:'deleted',curation_notes:`Merged into ${a.id}`});
@@ -1015,10 +1019,10 @@ function DupesSection({ who, showToast, onStatsChange }) {
       {/* Candidates list */}
       <div style={{ width:320,flexShrink:0,borderRight:'1px solid var(--border-subtle)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
         <div style={{ padding:'16px 16px 12px',borderBottom:'1px solid var(--border-subtle)',display:'flex',flexDirection:'column',gap:10 }}>
-          <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+          {/* <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
             <div style={{ fontFamily:'var(--font-display)',fontWeight:700,fontSize:14 }}>Pending candidates</div>
             <Badge color={cands.length?'warning':'default'}>{cands.length} shown / {totalPending} pending</Badge>
-          </div>
+          </div> */}
           <Btn variant="primary" size="sm" onClick={runScan} disabled={computing} style={{ width:'100%' }}>
             {computing?<><Spinner size={12} color="#fff"/> Scanning…</>:'🔍 Scan for duplicates'}
           </Btn>
@@ -1072,11 +1076,13 @@ function DupesSection({ who, showToast, onStatsChange }) {
             </div>
             {FIELDS.map(field=>{
               const av=sel.a[field]||'', bv=sel.b[field]||'', same=av===bv;
+              const customOn = choices[field]==='custom';
+              const customVal = customValues[field] ?? '';
               return (
                 <div key={field} style={{ display:'grid',gridTemplateColumns:'130px 1fr 1fr',gap:10,marginBottom:8,alignItems:'start' }}>
                   <div style={{ paddingTop:10,fontSize:10,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:'var(--font-display)' }}>{field.replace(/_/g,' ')}</div>
                   {['a','b'].map(side=>{
-                    const val=side==='a'?av:bv, chosen=choices[field]===side, discarded=!same&&choices[field]!==side;
+                    const val=side==='a'?av:bv, chosen=choices[field]===side, discarded=!same&&choices[field]!==side&&choices[field]!=='custom';
                     return <div key={side} onClick={()=>!same&&setChoices(c=>({...c,[field]:side}))} style={{
                       padding:'8px 12px',borderRadius:'var(--radius-sm)',
                       border:`1.5px solid ${chosen?'rgba(16,185,129,0.5)':discarded?'var(--border-subtle)':'var(--border-default)'}`,
@@ -1089,6 +1095,23 @@ function DupesSection({ who, showToast, onStatsChange }) {
                       transition:'all var(--transition-base)',lineHeight:1.4,wordBreak:'break-word',
                     }}>{val||'(empty)'}{chosen&&!same&&<span style={{ float:'right',color:'#10B981',fontSize:12 }}>✓</span>}</div>;
                   })}
+                  <div />
+                  <div style={{ gridColumn:'2/4',display:'flex',flexDirection:'column',gap:6 }}>
+                    <button
+                      onClick={()=>setChoices(c=>({...c,[field]:customOn?'a':'custom'}))}
+                      style={{ alignSelf:'flex-start',padding:'5px 10px',borderRadius:'var(--radius-full)',border:`1px solid ${customOn?'rgba(16,185,129,0.5)':'var(--border-default)'}`,background:customOn?'rgba(16,185,129,0.08)':'var(--bg-elevated)',color:customOn?'#10B981':'var(--text-secondary)',fontSize:11,fontWeight:700,fontFamily:'var(--font-display)' }}
+                    >
+                      {customOn?'✓ Custom value enabled':'Use custom value'}
+                    </button>
+                    {customOn && (
+                      <Inp
+                        value={customVal}
+                        onChange={v=>setCustomValues(cv=>({...cv,[field]:v}))}
+                        placeholder={`Enter custom ${field.replace(/_/g,' ')}…`}
+                        rows={field==='description'?3:undefined}
+                      />
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -1100,7 +1123,8 @@ function DupesSection({ who, showToast, onStatsChange }) {
             ))}
             <div style={{ display:'grid',gridTemplateColumns:'130px 1fr 1fr',gap:10,marginTop:8 }}>
               <div/>
-              {[sel.a,sel.b].map((v,i)=><div key={i} style={{ borderRadius:'var(--radius-sm)',overflow:'hidden' }}><ImgCarousel images={v.image_urls} height={120}/></div>)}
+              {[sel.a,sel.b].map((v,i)=><div key={i} style={{ borderRadius:'var(--radius-sm)',overflow:'hidden' }}><ImgCarousel images={v.image_urls} style={{ asepectRatio: '4 / 3'}}/>
+              </div>)}
             </div>
           </div>
         </div>
