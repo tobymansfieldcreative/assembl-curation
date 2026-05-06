@@ -424,7 +424,7 @@ function AppShell({ who, active, setActive, stats, onLogout, theme, setTheme, ch
             const on = active===item.id;
             return (
               <button key={item.id} onClick={()=>setActive(item.id)} style={{ width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:'var(--radius-sm)',border:'none',background:on?'rgba(232,98,42,0.12)':'transparent',color:on?'var(--color-brand)':'var(--sidebar-text-secondary)',fontFamily:'var(--font-display)',fontWeight:on?700:500,fontSize:13,cursor:'pointer',marginBottom:2,transition:'all var(--transition-base)',textAlign:'left' }}>
-                <span style={{ fontSize:15 }}>{item.icon}</span>
+                {/* <span style={{ fontSize:15 }}>{item.icon}</span> */}
                 {item.label}
                 {item.id==='triage' && stats?.flagged>0 && <span style={{ marginLeft:'auto',background:'var(--color-warning)',color:'#000',borderRadius:'var(--radius-full)',fontSize:10,fontWeight:800,padding:'1px 6px' }}>{stats.flagged}</span>}
                 {item.id==='dupes'  && stats?.pendingDupes>0 && <span style={{ marginLeft:'auto',background:'var(--color-warning)',color:'#000',borderRadius:'var(--radius-full)',fontSize:10,fontWeight:800,padding:'1px 6px' }}>{stats.pendingDupes}</span>}
@@ -453,7 +453,10 @@ function AppShell({ who, active, setActive, stats, onLogout, theme, setTheme, ch
       <div style={{ flex:1,overflow:'hidden',display:'flex',flexDirection:'column',background:'var(--bg-base)' }}>
         <div style={{ padding:'14px 24px',borderBottom:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',background:'var(--bg-surface)',flexShrink:0, textAlign:'left' }}>
           <div>
-            <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:17 }}>{NAV.find(n=>n.id===active)?.icon} {NAV.find(n=>n.id===active)?.label}</div>
+            <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:17 }}>
+              {/* {NAV.find(n=>n.id===active)?.icon} */}
+              {NAV.find(n=>n.id===active)?.label}
+              </div>
             <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:1 }}>{NAV.find(n=>n.id===active)?.desc}</div>
           </div>
         </div>
@@ -714,7 +717,7 @@ function VenuesSection({ who, allFeatures, showToast, onStatsChange }) {
             <Inp value={search} onChange={setSearch} placeholder="Search venues…" style={{ flex:1,maxWidth:300 }} />
             <Sel value={fCat} onChange={setFCat}><option value="">All categories</option>{CAT_OPTS.map(c=><option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}</Sel>
             <Sel value={fBorough} onChange={setFBorough}><option value="">All boroughs</option>{boroughs.map(b=><option key={b} value={b}>{b}</option>)}</Sel>
-            <Btn variant="ghost" size="sm" onClick={load} title="Refresh" style={{ fontSize:23 }}>↺</Btn>
+            <Btn variant="ghost" size="sm" onClick={()=>setSearch('')} title="Clear search" style={{ fontSize:20 }}>×</Btn>
           </div>
           <div style={{ display:'flex',gap:6,alignItems:'center' }}>
             {STATUS_TABS.map(f=>(
@@ -1127,13 +1130,13 @@ function DupesSection({ who, showToast, onStatsChange }) {
                     const val=side==='a'?av:bv, chosen=choices[field]===side, discarded=!same&&choices[field]!==side&&choices[field]!=='custom';
                     return <div key={side} onClick={()=>!same&&setChoices(c=>({...c,[field]:side}))} style={{
                       padding:'8px 12px',borderRadius:'var(--radius-sm)',
-                      border:`1.5px solid ${chosen?'rgba(16,185,129,0.5)':discarded?'var(--border-subtle)':'var(--border-default)'}`,
+                      border:`1.5px solid ${chosen?'rgba(16,185,129,0.5)':discarded?'var(--border-default)':'var(--border-subtle)'}`,
                       background:chosen?'rgba(16,185,129,0.08)':'var(--bg-elevated)',
                       cursor:same?'default':'pointer',
                       fontSize:13,
-                      color:chosen?'var(--text-primary)':discarded?'var(--text-muted)':val?'var(--text-primary)':'var(--text-muted)',
+                      color:chosen?'var(--text-primary)':discarded?'var(--text-primary)':val?'var(--text-muted)':'var(--text-muted)',
                       fontStyle:!val?'italic':'normal',
-                      opacity:discarded?0.5:1,
+                      opacity:val?0.7:1,
                       transition:'all var(--transition-base)',lineHeight:1.4,wordBreak:'break-word',
                     }}>{val||'(empty)'}{chosen&&!same&&<span style={{ float:'right',color:'#10B981',fontSize:12 }}>✓</span>}</div>;
                   })}
@@ -1326,6 +1329,7 @@ function RefSection({ showToast }) {
                   <option value="cuisine">cuisine</option>
                   <option value="food_offering">food offering</option>
                   <option value="dietary">dietary</option>
+                  <option value="dietary">music</option>
                 </Sel>
               </FRow>
               <FRow label="Question" hint="Shown when rating"><Inp value={draft.question||''} onChange={setD('question')} placeholder="Was there craft beer?" rows={2} /></FRow>
@@ -1403,7 +1407,7 @@ function ActivitySection({ showToast }) {
             </tr></thead>
             <tbody>
               {rows.map((r,i)=>(
-                <tr key={r.id} style={{ borderBottom:'1px solid var(--border-subtle)',background:i%2?'rgba(255,255,255,0.015)':'transparent' }}>
+                <tr key={r.id} style={{ borderBottom:'1px solid var(--border-subtle)',background:i%2?'rgba(255,255,255,0.015)':'transparent', textAlign:'left' }}>
                   <td style={{ padding:'10px 16px',fontWeight:600,fontSize:13 }}>{r.name}</td>
                   <td style={{ padding:'10px 16px',fontSize:12,color:'var(--text-secondary)' }}>{[r.category?.replace(/_/g,' '),r.borough].filter(Boolean).join(' · ')||'—'}</td>
                   <td style={{ padding:'10px 16px' }}>{r.curation_status==='deleted'?<Badge color="error">Deleted</Badge>:r.curation_status==='flagged'?<Badge color="warning">Flagged</Badge>:<Badge color="success">Active</Badge>}</td>
