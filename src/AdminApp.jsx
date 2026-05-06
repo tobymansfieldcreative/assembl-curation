@@ -35,6 +35,24 @@ const GLOBAL_CSS = `
     --radius-full: 100px;
     --sidebar-w: 220px;
     --transition-base: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-bg: #15151f;
+    --sidebar-border: #252533;
+    --sidebar-text: #ffffff;
+    --sidebar-text-secondary: #b2b5be;
+    --sidebar-text-muted: #697182;
+  }
+
+  [data-theme="light"] {
+    --bg-base: #f5f4f2;
+    --bg-surface: #ffffff;
+    --bg-elevated: #F0EDE8;
+    --bg-overlay: #0000000f;
+    --bg-hover: rgba(0,0,0,0.04);
+    --text-primary: #1A1714;
+    --text-secondary: #6B6460;
+    --text-muted: #9C9490;
+    --border-subtle: #0000000c;
+    --border-default: #00000012;
   }
 
   html, body { height: 100%; }
@@ -393,19 +411,19 @@ const NAV = [
   { id:'activity',  icon:'📋', label:'Activity',        desc:'Edit history' },
 ];
 
-function AppShell({ who, active, setActive, stats, onLogout, children }) {
+function AppShell({ who, active, setActive, stats, onLogout, theme, setTheme, children }) {
   return (
     <div style={{ display:'flex',height:'100vh',overflow:'hidden' }}>
-      <div style={{ width:'var(--sidebar-w)',flexShrink:0,background:'var(--bg-surface)',borderRight:'1px solid var(--border-subtle)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding:'20px 20px 16px',borderBottom:'1px solid var(--border-subtle)', textAlign:'left' }}>
+      <div style={{ width:'var(--sidebar-w)',flexShrink:0,background:'var(--sidebar-bg)',borderRight:'1px solid var(--sidebar-border)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding:'20px 20px 16px',borderBottom:'1px solid var(--sidebar-border)', textAlign:'left' }}>
           <AssemblWordmark style={{ width:100, height:22, marginBottom:4 }} />
-          <div style={{ fontSize:11,color:'var(--text-muted)',marginTop:2,fontWeight:600,letterSpacing:'0.05em' }}>ADMIN CONSOLE</div>
+          <div style={{ fontSize:11,color:'var(--sidebar-text-muted)',marginTop:2,fontWeight:600,letterSpacing:'0.05em' }}>ADMIN CONSOLE</div>
         </div>
         <nav style={{ flex:1,padding:'12px 10px',overflowY:'auto' }}>
           {NAV.map(item => {
             const on = active===item.id;
             return (
-              <button key={item.id} onClick={()=>setActive(item.id)} style={{ width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:'var(--radius-sm)',border:'none',background:on?'rgba(232,98,42,0.12)':'transparent',color:on?'var(--color-brand)':'var(--text-secondary)',fontFamily:'var(--font-display)',fontWeight:on?700:500,fontSize:13,cursor:'pointer',marginBottom:2,transition:'all var(--transition-base)',textAlign:'left' }}>
+              <button key={item.id} onClick={()=>setActive(item.id)} style={{ width:'100%',display:'flex',alignItems:'center',gap:10,padding:'9px 10px',borderRadius:'var(--radius-sm)',border:'none',background:on?'rgba(232,98,42,0.12)':'transparent',color:on?'var(--color-brand)':'var(--sidebar-text-secondary)',fontFamily:'var(--font-display)',fontWeight:on?700:500,fontSize:13,cursor:'pointer',marginBottom:2,transition:'all var(--transition-base)',textAlign:'left' }}>
                 <span style={{ fontSize:15 }}>{item.icon}</span>
                 {item.label}
                 {item.id==='triage' && stats?.flagged>0 && <span style={{ marginLeft:'auto',background:'var(--color-warning)',color:'#000',borderRadius:'var(--radius-full)',fontSize:10,fontWeight:800,padding:'1px 6px' }}>{stats.flagged}</span>}
@@ -414,11 +432,21 @@ function AppShell({ who, active, setActive, stats, onLogout, children }) {
             );
           })}
         </nav>
-        <div style={{ padding:'12px 16px',borderTop:'1px solid var(--border-subtle)' }}>
-          <div style={{ fontSize:11,color:'var(--text-muted)' }}>Signed in as</div>
+        <div style={{ padding:'12px 16px',borderTop:'1px solid var(--sidebar-border)',borderBottom:'1px solid var(--sidebar-border)' }}>
+          <div style={{ fontSize:11,color:'var(--sidebar-text-muted)',marginBottom:8 }}>Theme</div>
+          <button
+            onClick={()=>setTheme(theme==='dark'?'light':'dark')}
+            style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border-default)',background:'var(--bg-overlay)',color:'var(--sidebar-text-secondary)',fontSize:12,fontWeight:600,fontFamily:'var(--font-display)' }}
+          >
+            <span>{theme==='dark'?'Dark mode':'Light mode'}</span>
+            <span>{theme==='dark'?'🌙':'☀️'}</span>
+          </button>
+        </div>
+        <div style={{ padding:'12px 16px' }}>
+          <div style={{ fontSize:11,color:'var(--sidebar-text-muted)' }}>Signed in as</div>
           <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2 }}>
-            <div style={{ fontSize:13,fontWeight:600,color:'var(--text-secondary)',fontFamily:'var(--font-display)' }}>{who||'anonymous'}</div>
-            <button onClick={onLogout} title="Sign out" style={{ background:'none',border:'none',color:'var(--text-muted)',fontSize:13,cursor:'pointer',padding:'2px 4px',borderRadius:4 }}>↩</button>
+            <div style={{ fontSize:13,fontWeight:600,color:'var(--sidebar-text-secondary)',fontFamily:'var(--font-display)' }}>{who||'anonymous'}</div>
+            <button onClick={onLogout} title="Sign out" style={{ background:'none',border:'none',color:'var(--sidebar-text-muted)',fontSize:13,cursor:'pointer',padding:'2px 4px',borderRadius:4 }}>↩</button>
           </div>
         </div>
       </div>
@@ -1325,7 +1353,10 @@ function ActivitySection({ showToast }) {
 export default function AdminApp() {
   const { ok, who, session, sendOtp, verifyOtp, logout, saveWho } = useAuth();
   const [section,setSection]=useState('venues'), [allFeatures,setAllFeatures]=useState([]), [stats,setStats]=useState({unreviewed:0,pendingDupes:0}), [whoModal,setWhoModal]=useState(false);
+  const [theme,setTheme]=useState(() => localStorage.getItem('admin_theme') || 'dark');
   const { show: showToast, el: toastEl } = useToast();
+
+  useEffect(()=>{ localStorage.setItem('admin_theme', theme); },[theme]);
 
   useEffect(()=>{
     if (!ok) return;
@@ -1353,13 +1384,15 @@ export default function AdminApp() {
   return (
     <>
       <style>{GLOBAL_CSS}</style>
-      <AppShell who={who} active={section} setActive={setSection} stats={stats} onLogout={logout}>
+      <div data-theme={theme} style={{ height:'100%' }}>
+      <AppShell who={who} active={section} setActive={setSection} stats={stats} onLogout={logout} theme={theme} setTheme={setTheme}>
         {section==='venues'    && <VenuesSection    {...sp} />}
         {section==='triage'    && <TriageSection    {...sp} />}
         {section==='dupes'     && <DupesSection     who={who} showToast={showToast} onStatsChange={refreshStats} />}
         {section==='reference' && <RefSection       showToast={showToast} />}
         {section==='activity'  && <ActivitySection  showToast={showToast} />}
       </AppShell>
+      </div>
 
       <Modal open={whoModal} onClose={()=>setWhoModal(false)} title="What should we call you?">
         <div style={{ color:'var(--text-secondary)',fontSize:14,marginBottom:20 }}>Your name is stored with each edit so changes are trackable.</div>
