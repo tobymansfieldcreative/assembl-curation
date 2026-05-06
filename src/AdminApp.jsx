@@ -413,10 +413,10 @@ const NAV = [
 
 function AppShell({ who, active, setActive, stats, onLogout, theme, setTheme, children }) {
   return (
-    <div style={{ display:'flex',height:'100vh',overflow:'hidden' }}>
+    <div style={{ display:'flex',height:'100vh',overflow:'hidden',background:'var(--bg-base)',color:'var(--text-primary)' }}>
       <div style={{ width:'var(--sidebar-w)',flexShrink:0,background:'var(--sidebar-bg)',borderRight:'1px solid var(--sidebar-border)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding:'20px 20px 16px',borderBottom:'1px solid var(--sidebar-border)', textAlign:'left' }}>
-          <AssemblWordmark style={{ width:100, height:22, marginBottom:4 }} />
+          <AssemblWordmark style={{ width:100, height:22, marginBottom:4, color:'#ffffff' }} />
           <div style={{ fontSize:11,color:'var(--sidebar-text-muted)',marginTop:2,fontWeight:600,letterSpacing:'0.05em' }}>ADMIN CONSOLE</div>
         </div>
         <nav style={{ flex:1,padding:'12px 10px',overflowY:'auto' }}>
@@ -450,14 +450,14 @@ function AppShell({ who, active, setActive, stats, onLogout, theme, setTheme, ch
           </div>
         </div>
       </div>
-      <div style={{ flex:1,overflow:'hidden',display:'flex',flexDirection:'column' }}>
+      <div style={{ flex:1,overflow:'hidden',display:'flex',flexDirection:'column',background:'var(--bg-base)' }}>
         <div style={{ padding:'14px 24px',borderBottom:'1px solid var(--border-subtle)',display:'flex',alignItems:'center',background:'var(--bg-surface)',flexShrink:0, textAlign:'left' }}>
           <div>
             <div style={{ fontFamily:'var(--font-display)',fontWeight:800,fontSize:17 }}>{NAV.find(n=>n.id===active)?.icon} {NAV.find(n=>n.id===active)?.label}</div>
             <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:1 }}>{NAV.find(n=>n.id===active)?.desc}</div>
           </div>
         </div>
-        <div style={{ flex:1,display:'flex',overflow:'hidden' }} className="anim-fade">{children}</div>
+        <div style={{ flex:1,display:'flex',overflow:'hidden',background:'var(--bg-base)' }} className="anim-fade">{children}</div>
       </div>
     </div>
   );
@@ -1353,7 +1353,7 @@ function ActivitySection({ showToast }) {
 export default function AdminApp() {
   const { ok, who, session, sendOtp, verifyOtp, logout, saveWho } = useAuth();
   const [section,setSection]=useState('venues'), [allFeatures,setAllFeatures]=useState([]), [stats,setStats]=useState({unreviewed:0,pendingDupes:0}), [whoModal,setWhoModal]=useState(false);
-  const [theme,setTheme]=useState(() => localStorage.getItem('admin_theme') || 'dark');
+  const [theme,setTheme]=useState(() => localStorage.getItem('admin_theme') || 'light');
   const { show: showToast, el: toastEl } = useToast();
 
   useEffect(()=>{ localStorage.setItem('admin_theme', theme); },[theme]);
