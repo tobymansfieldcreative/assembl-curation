@@ -1430,7 +1430,7 @@ function RefSection({ showToast }) {
                   <option value="food_offering">food offering</option>
                   <option value="dietary">dietary</option>
                   <option value="music">music</option>  
-                  <option value="type">venue type</option>
+                  <option value="venue_type">venue type</option>
                 </Sel>
               </FRow>
               <FRow label="Question" hint="Shown when rating"><Inp value={draft.question||''} onChange={setD('question')} placeholder="Was there craft beer?" rows={2} /></FRow>
