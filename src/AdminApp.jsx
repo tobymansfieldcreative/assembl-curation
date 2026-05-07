@@ -1043,7 +1043,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
     catch(e){showToast(e.message,'error');}
   };
 
-  const merge = async () => {
+  const merge = async (flagForReview = false) => {
     if(!sel) return;
     const{a,b,candId}=sel;
     setMerging(true);
@@ -1052,7 +1052,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
         if (choices[k]==='custom') return customValues[k] ?? '';
         return choices[k]==='b' ? b[k] : a[k];
       };
-      const merged={ name:pick('name'), description:pick('description'), category:pick('category'), borough:pick('borough'), locality:pick('locality'), address:pick('address'), verified_url:pick('verified_url')||pick('website'), booking_url:pick('booking_url'), phone:pick('phone'), features:choices.features==='merge'?[...new Set([...parseSlugs(a.features),...parseSlugs(b.features)])]:parseSlugs(pick('features')), image_urls:choices.image_urls==='merge'?[...new Set([...parseImages(a.image_urls),...parseImages(b.image_urls)])]:parseImages(pick('image_urls')), curation_updated_at:new Date().toISOString(), curation_updated_by:who||'admin' };
+      const merged={ name:pick('name'), description:pick('description'), category:pick('category'), borough:pick('borough'), locality:pick('locality'), address:pick('address'), verified_url:pick('verified_url')||pick('website'), booking_url:pick('booking_url'), phone:pick('phone'), features:choices.features==='merge'?[...new Set([...parseSlugs(a.features),...parseSlugs(b.features)])]:parseSlugs(pick('features')), image_urls:choices.image_urls==='merge'?[...new Set([...parseImages(a.image_urls),...parseImages(b.image_urls)])]:parseImages(pick('image_urls')), curation_status:flagForReview?'flagged':null, curation_notes:flagForReview?`Merged from ${b.id}; flagged for review`:null, curation_updated_at:new Date().toISOString(), curation_updated_by:who||'admin' };
       await sb('PATCH',`venues?id=eq.${a.id}`,merged);
       await sb('PATCH',`venues?id=eq.${b.id}`,{curation_status:'deleted',curation_notes:`Merged into ${a.id}`});
       try{await sb('PATCH',`outing_venues?venue_id=eq.${b.id}`,{venue_id:a.id});}catch{}
@@ -1126,7 +1126,7 @@ function DupesSection({ who, showToast, onStatsChange }) {
       }
       if (newPairs.length) await sb('POST','duplicate_candidates',newPairs);
 
-      showToast(`Merged "${b.name}" into "${a.name}"`);
+      showToast(flagForReview ? `Merged "${b.name}" into "${a.name}" and flagged for review` : `Merged "${b.name}" into "${a.name}"`);
       await loadCands();
       setCands(c=>c.filter(x=>x.id!==candId&&x.venue_a!==b.id&&x.venue_b!==b.id));
       setSel(null);
@@ -1207,7 +1207,10 @@ function DupesSection({ who, showToast, onStatsChange }) {
             <Btn variant="danger" size="sm" onClick={deleteBoth} disabled={merging||deletingBoth}>
               {deletingBoth?<><Spinner size={12} color="#EF4444"/> Deleting…</>:'🗑 Delete both venues'}
             </Btn>
-            <Btn variant="primary" size="sm" onClick={merge} disabled={merging||deletingBoth}>{merging?<><Spinner size={12} color="#fff"/> Merging…</>:'⚡ Merge'}</Btn>
+            <Btn variant="default" size="sm" onClick={()=>merge(true)} disabled={merging||deletingBoth}>
+              {merging?<><Spinner size={12} color="var(--text-secondary)"/> Merging…</>:'⚡ Merge and flag for review'}
+            </Btn>
+            <Btn variant="primary" size="sm" onClick={()=>merge(false)} disabled={merging||deletingBoth}>{merging?<><Spinner size={12} color="#fff"/> Merging…</>:'⚡ Merge'}</Btn>
           </div>
           <div style={{ flex:1,overflowY:'auto',padding:24 }}>
             <div style={{ display:'grid',gridTemplateColumns:'130px 1fr 1fr',gap:10,marginBottom:14 }}>
