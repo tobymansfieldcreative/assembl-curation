@@ -144,6 +144,33 @@ async function sbAuth(path, body) {
   return data;
 }
 
+async function fetchProfileName(userId, accessToken) {
+  if (!userId || !accessToken) return '';
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${userId}&select=*&limit=1`, {
+      method: 'GET',
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    if (!res.ok) return '';
+    const rows = await res.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return '';
+    return (
+      row.full_name ||
+      row.display_name ||
+      row.first_name ||
+      row.name ||
+      row.username ||
+      ''
+    ).toString().trim();
+  } catch {
+    return '';
+  }
+}
+
 async function refreshSession(refreshToken) {
   const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
@@ -209,12 +236,12 @@ function useAuth() {
   const verifyOtp = async (email, token) => {
     const data = await sbAuth('verify', { email, token, type: 'email' });
     if (data.access_token) {
+      const profileName = await fetchProfileName(data.user?.id, data.access_token);
       sessionStorage.setItem('admin_session', JSON.stringify(data));
       setSession(data);
       const emailPrefix = email.split('@')[0];
-      const profileName =
-        (data.user?.user_metadata?.full_name || data.user?.user_metadata?.name || data.user?.email?.split('@')?.[0] || '').trim();
-      const preferredName = profileName || emailPrefix;
+      const metadataName = (data.user?.user_metadata?.full_name || data.user?.user_metadata?.name || '').trim();
+      const preferredName = profileName || metadataName || emailPrefix;
       // Migrate old fallback values (email prefix) to profile name when available.
       if (!who || who === emailPrefix) { localStorage.setItem('admin_who', preferredName); setWho(preferredName); }
       return true;
