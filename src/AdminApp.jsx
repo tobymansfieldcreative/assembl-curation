@@ -211,8 +211,12 @@ function useAuth() {
     if (data.access_token) {
       sessionStorage.setItem('admin_session', JSON.stringify(data));
       setSession(data);
-      const name = email.split('@')[0];
-      if (!who) { localStorage.setItem('admin_who', name); setWho(name); }
+      const emailPrefix = email.split('@')[0];
+      const profileName =
+        (data.user?.user_metadata?.full_name || data.user?.user_metadata?.name || data.user?.email?.split('@')?.[0] || '').trim();
+      const preferredName = profileName || emailPrefix;
+      // Migrate old fallback values (email prefix) to profile name when available.
+      if (!who || who === emailPrefix) { localStorage.setItem('admin_who', preferredName); setWho(preferredName); }
       return true;
     }
     return false;
